@@ -1,4 +1,4 @@
-# Author: TK
+# Author: Mohammad Hammad Asif
 # Date: 24-04-2026
 # Purpose: Analyze HTTP security headers and basic HTTPS/TLS web security posture.
 
