@@ -1,4 +1,4 @@
-# Author: TK
+# Author: Mohammad hammad Asif
 # Date: 22-04-2025
 # Purpose: Store default scan settings such as timeout, concurrency (execute multiple tasks by overlapping execution times.), rate limits, modules.
 
