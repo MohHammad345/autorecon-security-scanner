@@ -1,4 +1,4 @@
-# Author: TK
+# Author: Mohammad Hammad Asif
 # Date: 24-04-2026
 # Purpose: Scan for open TCP ports and perform basic service/banner detection.
 
