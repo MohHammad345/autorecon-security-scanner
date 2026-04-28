@@ -1,4 +1,4 @@
-# Author: TK
+# Author: Mohammad Hammad Asif 
 # Date: 24-04-2026
 # Purpose: Fingerprint web technologies using HTTP headers and HTML content
 
