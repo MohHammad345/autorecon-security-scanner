@@ -1,4 +1,4 @@
-# Author: TK
+# Author: Mohammad Hammad Asif
 # Date: 24-06-2026
 # Purpose: Generate a simple HTML dashboard report from scan results.
 
