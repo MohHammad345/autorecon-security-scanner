@@ -1,4 +1,4 @@
-# Author: TK
+# Author: Mohammad Hammad Asif
 # Date: 23-04-2026
 # Purpose: Orchestrate the recon workflow by running enabled modules, collecting results, and building final scan outputs.
 
