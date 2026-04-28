@@ -1,4 +1,4 @@
-# Author: TK
+# Author: Mohammad Hammad Asif
 # Date: 22-04-2026
 # Purpose: Load and merge config files and provide helper funcs for accessing config values safely.
 from __future__ import annotations
