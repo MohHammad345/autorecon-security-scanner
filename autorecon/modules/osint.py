@@ -1,4 +1,4 @@
-# Author: TK
+# Author: Mohammad Hammad Asif
 # Date: 24-04-2026
 # Purpose: Gathers OSINT data such as WHOIS information and DNS records.
 
