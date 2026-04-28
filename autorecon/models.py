@@ -1,4 +1,4 @@
-# Author: TK
+# Author: Mohammad Hammad Asif
 # Date: 2024-06-01
 # Purpose: Define the database models for the AutoRecon application.
 from __future__ import annotations
