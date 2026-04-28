@@ -1,0 +1,227 @@
+# Author: TK
+# Date: 22-04-2026
+# Purpose: Handles command-line args, load config, and start the correct scan workflow.
+
+from __future__ import annotations
+
+import argparse
+import asyncio
+import json
+import sys
+from pathlib import Path
+from typing import Any
+
+from rich.console import Console
+from rich.table import Table
+
+from autorecon.core.config_loader import load_config
+from autorecon.core.pipeline import ReconPipeline
+from autorecon.core.target import load_targets_from_file, parse_target
+from autorecon.exceptions import AutoReconError
+from autorecon.reporting.export import build_module_summary_rows
+
+BANNER = r"""
+    ___         __        ____                      
+   /   | __  __/ /_____  / __ \___  _________  ____ 
+  / /| |/ / / / __/ __ \/ /_/ / _ \/ ___/ __ \/ __ \
+ / ___ / /_/ / /_/ /_/ / _, _/  __/ /__/ /_/ / / / /
+/_/  |_\__,_/\__/\____/_/ |_|\___/\___/\____/_/ /_/ 
+                                          v1.0 by TK
+"""
+
+console = Console()
+
+def build_parser() -> argparse.ArgumentParser:
+    """Build and return the main CLI parser."""
+    parser = argparse.ArgumentParser(
+        prog="autorecon",
+        description="A modular Python-based autoRecon tool."
+        
+    )
+    
+    parser.add_argument(
+        "--config",
+        type=str,
+        default=None,
+        help="Path to a custom YAML config file.",
+    )
+
+    subparsers = parser.add_subparsers(dest="command", required=True)
+    
+    # scan command
+    scan_parser = subparsers.add_parser(
+        "scan",
+        help="Run the recon pipeline against one target or a file of targets.",
+    )
+    scan_parser.add_argument(
+        "target",
+        nargs="?",
+        help="Single target domain, IP, or URL.",
+    )
+    scan_parser.add_argument(
+        "-f",
+        "--file",
+        dest="target_file",
+        help="Path to a file containing targets.",
+    )
+    
+    scan_parser.add_argument(
+        "--full",
+        action="store_true",
+        help="Run the full recon pipeline.",
+    )
+    scan_parser.add_argument(
+        "--output",
+        type=str,
+        default="reports",
+        help="Directory to store output files.",
+    )
+    scan_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Print JSON results to stdout.",
+    )
+    
+    # target validation command
+    validate_parser = subparsers.add_parser(
+        "validate",
+        help="Validate and normalize a single target."
+    )
+    validate_parser.add_argument(
+        "target",
+        help="Target domain, IP, or URL to validate."
+    )
+    
+    return parser
+
+def print_target_summary(target: Any) -> None:
+    """Display a parsed target in a rich table."""
+    table = Table(title="Target Summary")
+    table.add_column("Field", style="cyan", no_wrap=True)
+    table.add_column("Value", style="white")
+    
+    table.add_row("Original", str(target.original))
+    table.add_row("Normalized", str(target.normalized))
+    table.add_row("Hostname", str(target.hostname))
+    table.add_row("Scheme", str(target.scheme))
+    table.add_row("Port", str(target.port))
+    table.add_row("Is IP", str(target.is_ip))
+    table.add_row("Resolvable", str(target.resolvable))
+    table.add_row("Resolved IPs", ", ".join(target.resolved_ips) if target.resolved_ips else "-")
+    table.add_row("Errors", ", ".join(target.errors) if target.errors else "-")
+    
+    console.print(table)
+    
+def print_module_summary(scan_result: Any) -> None:
+    """Display a compact per-module summary."""
+    rows = build_module_summary_rows(scan_result)
+
+    table = Table(title="Module Summary")
+    table.add_column("Module", style="cyan", no_wrap=True)
+    table.add_column("Status", style="white")
+    table.add_column("Items", justify="right")
+    table.add_column("Errors", justify="right")
+
+    for row in rows:
+        table.add_row(
+            str(row["module"]),
+            str(row["status"]),
+            str(row["item_count"]),
+            str(row["error_count"]),
+        )
+
+    console.print(table)
+    
+async def handle_scan(args: argparse.Namespace, config: dict[str, Any]) -> int:
+    """Handle the scan command."""
+    if not args.target and not args.target_file:
+        console.print("[red]Error:[/red] You must provide either a target or a target file.")
+        return 1
+    
+    if args.target and args.target_file:
+        console.print("[red]Error:[/red] Use either a single target or --file, not both.")
+        return 1
+    
+    if args.target_file:
+        targets = load_targets_from_file(args.target_file)
+    else:
+        targets = [parse_target(args.target)]
+    
+    output_dir = Path(args.output)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    pipeline = ReconPipeline(config=config, output_dir=output_dir)
+    
+    from rich.progress import Progress, SpinnerColumn, TextColumn
+
+    console.print(BANNER, style="cyan")
+    console.print(f"[bold green]Loaded[/bold green] {len(targets)} target(s).\n")
+
+    all_results = []
+    for t in targets:
+        console.rule(f"[bold]{t.normalized}[/bold]")
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console,
+        ) as progress:
+            task = progress.add_task("[cyan]Starting...", total=len(pipeline.modules))
+            
+            def update_progress(module_name):
+                progress.update(task, advance=1, description=f"[cyan]Running {module_name}...")
+                
+            result = await pipeline.run_target(t, on_module_start=update_progress)
+        all_results.append(result)
+
+    results = all_results
+    
+    if args.json:
+        serializable = [result.to_dict() for result in results]
+        console.print_json(json.dumps(serializable, indent=2))
+    else:
+        for result in results:
+            print_target_summary(result.target)
+            print_module_summary(result)
+            console.print(
+                f"[green]Modules run:[/green] {', '.join(result.metadata.modules_run) if result.metadata.modules_run else 'None yet'}"
+            )
+            console.print(f"[green]Duration:[/green] {result.metadata.duration} seconds")
+            console.print(f"[green]Errors:[/green] {result.errors if result.errors else 'None'}")
+            console.rule()
+
+def handle_validate(args: argparse.Namespace) -> int:
+    """Handle the validate command."""
+    target = parse_target(args.target)
+    print_target_summary(target)
+    return 0
+
+async def async_main() -> int:
+    """Async CLI entry point."""
+    parser = build_parser()
+    args = parser.parse_args()
+    
+    try:
+        config = load_config(args.config)
+        
+        if args.command == "scan":
+            return await handle_scan(args, config)
+        
+        if args.command == "validate":
+            return handle_validate(args)
+        
+        console.print("[red]Error:[/red] Unknown command.")
+        return 1
+    
+    except AutoReconError as exc:
+        console.print(f"[red]AutoRecon error:[/red] {exc}")
+        return 1
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Scan cancelled by user.[/yellow]")
+        return 1
+    
+def main() -> None:
+    """Synchronous wrappper for the async CLI."""
+    sys.exit(asyncio.run(async_main()))
+    
+if __name__ == "__main__":
+    main()
