@@ -1,4 +1,4 @@
-# Author: TK
+# Author: Mohammad Hammad Asif
 # Date: 22-04-2026
 # Purpose: Parse, Normalize, validate, and resolve user-supplied targets such as domains, IP addr and urls.
 
