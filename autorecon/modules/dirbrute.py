@@ -1,4 +1,4 @@
-# Author: TK
+# Author: Mohammad Hammad Asif
 # Date: 24-04-2026
 # Purpose: Perform directory and file discovery against web targets using a wordlist.
 
