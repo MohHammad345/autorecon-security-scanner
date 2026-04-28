@@ -1,4 +1,4 @@
-# Author: TK
+# Author: Mohammad Hammad Asif
 # Date: 22-04-2026
 # Purpose: Handles command-line args, load config, and start the correct scan workflow.
 
